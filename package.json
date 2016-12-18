@@ -16,20 +16,60 @@
     "APIG",
     "API Gateway"
   ],
-  "author": "David Hérault <dherault@gmail.com> (https://github.com/dherault)",
+  "author": {
+    "name": "David Hérault",
+    "email": "dherault@gmail.com",
+    "url": "https://github.com/dherault"
+  },
   "contributors": [
-      "Michael Staub (https://github.com/mikestaub)",
-      "Bilal Soylu (https://github.com/Bilal-S)",
-      "John McKim (https://github.com/johncmckim)",
-      "Kiryl Yermakou (https://github.com/rma4ok)",
-      "Andrei Popovici (https://github.com/andreipopovici)",
-      "DJCrabhat (https://github.com/djcrabhat)",
-      "Martin Micunda (https://github.com/martinmicunda)",
-      "Andre Rabold (https://github.com/arabold)",
-      "Russell Schick (https://github.com/rschick)",
-      "Cameron Cooper (https://github.com/cameroncooper)",
-      "Piotr Gasiorowski (https://github.com/WooDzu)",
-      "Norimitsu Yamashita (https://github.com/nori3tsu)"
+    {
+      "name": "Michael Staub",
+      "url": "https://github.com/mikestaub"
+    },
+    {
+      "name": "Bilal Soylu",
+      "url": "https://github.com/Bilal-S"
+    },
+    {
+      "name": "John McKim",
+      "url": "https://github.com/johncmckim"
+    },
+    {
+      "name": "Kiryl Yermakou",
+      "url": "https://github.com/rma4ok"
+    },
+    {
+      "name": "Andrei Popovici",
+      "url": "https://github.com/andreipopovici"
+    },
+    {
+      "name": "DJCrabhat",
+      "url": "https://github.com/djcrabhat"
+    },
+    {
+      "name": "Martin Micunda",
+      "url": "https://github.com/martinmicunda"
+    },
+    {
+      "name": "Andre Rabold",
+      "url": "https://github.com/arabold"
+    },
+    {
+      "name": "Russell Schick",
+      "url": "https://github.com/rschick"
+    },
+    {
+      "name": "Cameron Cooper",
+      "url": "https://github.com/cameroncooper"
+    },
+    {
+      "name": "Piotr Gasiorowski",
+      "url": "https://github.com/WooDzu"
+    },
+    {
+      "name": "Norimitsu Yamashita",
+      "url": "https://github.com/nori3tsu"
+    }
   ],
   "license": "MIT",
   "bugs": {
@@ -43,12 +83,38 @@
     "hapi": "14.1.0",
     "js-string-escape": "^1.0.1",
     "jsonpath-plus": "^0.15.0",
-    "lodash.isplainobject": "^4.0.5",
+    "lodash": "^4.0.5",
     "velocityjs": "^0.8.5"
   },
   "devDependencies": {
     "eslint": "^3.2.2",
     "eslint-config-airbnb-base": "^5.0.1",
     "eslint-plugin-import": "^1.12.0"
-  }
+  },
+  "gitHead": "4fa8b74082556c6088700c818ad274d5e8356dea",
+  "_id": "serverless-offline@2.8.4",
+  "_shasum": "2f3728f7635afd720bbab8e6c7cfdaf8769cfbd5",
+  "_from": "serverless-offline@>=2.8.4 <3.0.0",
+  "_npmVersion": "3.10.3",
+  "_nodeVersion": "6.6.0",
+  "_npmUser": {
+    "name": "dherault",
+    "email": "dherault@gmail.com"
+  },
+  "dist": {
+    "shasum": "2f3728f7635afd720bbab8e6c7cfdaf8769cfbd5",
+    "tarball": "https://registry.npmjs.org/serverless-offline/-/serverless-offline-2.8.4.tgz"
+  },
+  "maintainers": [
+    {
+      "name": "dherault",
+      "email": "dherault@gmail.com"
+    }
+  ],
+  "_npmOperationalInternal": {
+    "host": "packages-16-east.internal.npmjs.com",
+    "tmp": "tmp/serverless-offline-2.8.4.tgz_1474037683922_0.6872666976414621"
+  },
+  "directories": {},
+  "_resolved": "https://registry.npmjs.org/serverless-offline/-/serverless-offline-2.8.4.tgz"
 }

@@ -9,7 +9,7 @@ const path = require('path');
 
 // External dependencies
 const Hapi = require('hapi');
-const isPlainObject = require('lodash.isplainobject');
+const _ = require('lodash');
 
 // Internal lib
 require('./javaHelper');
@@ -18,6 +18,7 @@ const debugLog = require('./debugLog');
 const jsonPath = require('./jsonPath');
 const createLambdaContext = require('./createLambdaContext');
 const createVelocityContext = require('./createVelocityContext');
+const createLambdaProxyContext = require('./createLambdaProxyContext');
 const renderVelocityTemplateObject = require('./renderVelocityTemplateObject');
 const createAuthScheme = require('./createAuthScheme');
 const functionHelper = require('./functionHelper');
@@ -133,7 +134,7 @@ module.exports = S => {
 
       // Serverless version checking
       const version = S._version;
-      if (!version.startsWith('0.5')) {
+      if (!version.startsWith('0.')) {
         serverlessLog(`Offline requires Serverless v0.5.x but found ${version}. Exiting.`);
         process.exit(0);
       }
@@ -188,7 +189,7 @@ module.exports = S => {
       if (!this.options.prefix.startsWith('/')) this.options.prefix = `/${this.options.prefix}`;
       if (!this.options.prefix.endsWith('/')) this.options.prefix += '/';
 
-      this.options.globalBabelOptions = ((this.project.custom || {})['serverless-offline'] || {}).babelOptions;
+      this.globalBabelOptions = ((this.project.custom || {})['serverless-offline'] || {}).babelOptions;
 
       this.velocityContextOptions = {
         stageVariables,
@@ -208,7 +209,7 @@ module.exports = S => {
 
       serverlessLog(`Starting Offline: ${this.options.stage}/${this.options.region}.`);
       debugLog('options:', this.options);
-      debugLog('globalBabelOptions:', this.options.globalBabelOptions);
+      debugLog('globalBabelOptions:', this.globalBabelOptions);
     }
 
     _registerBabel(isBabelRuntime, babelRuntimeOptions) {
@@ -216,7 +217,7 @@ module.exports = S => {
       // Babel options can vary from handler to handler just like env vars
       const options = isBabelRuntime ?
         babelRuntimeOptions || { presets: ['es2015'] } :
-        this.options.globalBabelOptions;
+        this.globalBabelOptions;
 
       if (options) {
         debugLog('Setting babel register:', options);
@@ -298,6 +299,7 @@ module.exports = S => {
 
           let firstCall = true;
 
+          const integration = endpoint.integration || 'lambda-proxy';
           const epath = endpoint.path;
           const method = endpoint.method.toUpperCase();
           const requestTemplates = endpoint.requestTemplates;
@@ -305,6 +307,7 @@ module.exports = S => {
           // Prefix must start and end with '/' BUT path must not end with '/'
           let fullPath = this.options.prefix + (epath.startsWith('/') ? epath.slice(1) : epath);
           if (fullPath !== '/' && fullPath.endsWith('/')) fullPath = path.slice(0, -1);
+          fullPath = fullPath.replace(/\+}/g, '*}');
 
           serverlessLog(`${method} ${fullPath}`);
 
@@ -336,7 +339,7 @@ module.exports = S => {
             debugLog(`Creating Authorization scheme for ${authKey}`);
 
             // Create the Auth Scheme for the endpoint
-            const scheme = createAuthScheme(authFunction, funRuntime, funName, epath, this.options, serverlessLog);
+            const scheme = createAuthScheme(authFunction, funName, epath, this.options, serverlessLog);
 
             // Set the auth scheme and strategy on the server
             this.server.auth.scheme(authSchemeName, scheme);
@@ -356,7 +359,7 @@ module.exports = S => {
 
           // Route creation
           this.server.route({
-            method,
+            method: method === 'ANY' ? '*' : method,
             path: fullPath,
             config: routeConfig,
             handler: (request, reply) => { // Here we go
@@ -375,7 +378,9 @@ module.exports = S => {
               // Holds the response to do async op
               const response = reply.response().hold();
               const contentType = request.mime || defaultContentType;
-              const requestTemplate = requestTemplates[contentType];
+
+              // default request template to '' if we don't have a definition pushed in from serverless or endpoint
+              const requestTemplate = typeof requestTemplates !== 'undefined' && integration === 'lambda' ? requestTemplates[contentType] : '';
 
               const contentTypesThatRequirePayloadParsing = ['application/json', 'application/vnd.api+json'];
 
@@ -417,17 +422,21 @@ module.exports = S => {
 
               let event = {};
 
-              if (requestTemplate) {
-                try {
-                  debugLog('_____ REQUEST TEMPLATE PROCESSING _____');
-                  // Velocity templating language parsing
-                  const velocityContext = createVelocityContext(request, this.velocityContextOptions, request.payload || {});
-                  event = renderVelocityTemplateObject(requestTemplate, velocityContext);
-                } catch (err) {
-                  return this._reply500(response, `Error while parsing template "${contentType}" for ${funName}`, err, requestId);
+              if (integration === 'lambda') {
+                if (requestTemplate) {
+                  try {
+                    debugLog('_____ REQUEST TEMPLATE PROCESSING _____');
+                    // Velocity templating language parsing
+                    const velocityContext = createVelocityContext(request, this.velocityContextOptions, request.payload || {});
+                    event = renderVelocityTemplateObject(requestTemplate, velocityContext);
+                  } catch (err) {
+                    return this._reply500(response, `Error while parsing template "${contentType}" for ${funName}`, err, requestId);
+                  }
+                } else if (typeof request.payload === 'object') {
+                  event = request.payload || {};
                 }
-              } else if (request.payload && typeof request.payload === 'object') {
-                event = request.payload || {};
+              } else if (integration === 'lambda-proxy') {
+                event = createLambdaProxyContext(request, this.options, this.velocityContextOptions.stageVariables);
               }
 
               event.isOffline = true;
@@ -463,13 +472,11 @@ module.exports = S => {
                   const errorMessage = (err.message || err).toString();
 
                   // Mocks Lambda errors
-                  result = Object.assign({}, err, {
+                  result = {
                     errorMessage,
                     errorType:  err.constructor.name,
                     stackTrace: this._getArrayStackTrace(err.stack),
-                  });
-
-                  delete result.message; // Is this necessary?
+                  };
 
                   serverlessLog(`Failure: ${errorMessage}`);
                   if (result.stackTrace) console.log(result.stackTrace.join('\n  '));
@@ -492,7 +499,7 @@ module.exports = S => {
 
                 const responseParameters = chosenResponse.responseParameters;
 
-                if (isPlainObject(responseParameters)) {
+                if (_.isPlainObject(responseParameters)) {
 
                   const responseParametersKeys = Object.keys(responseParameters);
 
@@ -545,53 +552,65 @@ module.exports = S => {
                   });
                 }
 
-                /* RESPONSE TEMPLATE PROCCESSING */
+                let statusCode = 200;
 
-                // If there is a responseTemplate, we apply it to the result
-                const responseTemplates = chosenResponse.responseTemplates;
+                if (integration === 'lambda') {
+                    /* RESPONSE TEMPLATE PROCCESSING */
+                    // If there is a responseTemplate, we apply it to the result
+                    const responseTemplates = chosenResponse.responseTemplates;
 
-                if (isPlainObject(responseTemplates)) {
+                    if (_.isPlainObject(responseTemplates)) {
 
-                  const responseTemplatesKeys = Object.keys(responseTemplates);
+                      const responseTemplatesKeys = Object.keys(responseTemplates);
 
-                  if (responseTemplatesKeys.length) {
+                      if (responseTemplatesKeys.length) {
 
-                    // BAD IMPLEMENTATION: first key in responseTemplates
-                    const templateName = responseTemplatesKeys[0];
-                    const responseTemplate = responseTemplates[templateName];
+                        // BAD IMPLEMENTATION: first key in responseTemplates
+                        const responseTemplate = responseTemplates[responseContentType];
 
-                    responseContentType = templateName;
+                        if (responseTemplate) {
 
-                    if (responseTemplate) {
+                          debugLog('_____ RESPONSE TEMPLATE PROCCESSING _____');
+                          debugLog(`Using responseTemplate '${responseContentType}'`);
 
-                      debugLog('_____ RESPONSE TEMPLATE PROCCESSING _____');
-                      debugLog(`Using responseTemplate '${templateName}'`);
-
-                      try {
-                        const reponseContext = createVelocityContext(request, this.velocityContextOptions, result);
-                        result = renderVelocityTemplateObject({ root: responseTemplate }, reponseContext).root;
-                      }
-                      catch (error) {
-                        serverlessLog(`Error while parsing responseTemplate '${templateName}' for lambda ${funName}:`);
-                        console.log(error.stack);
+                          try {
+                            const reponseContext = createVelocityContext(request, this.velocityContextOptions, result);
+                            result = renderVelocityTemplateObject({ root: responseTemplate }, reponseContext).root;
+                          }
+                          catch (error) {
+                            this.serverlessLog(`Error while parsing responseTemplate '${responseContentType}' for lambda ${funName}:`);
+                            console.log(error.stack);
+                          }
+                        }
                       }
                     }
+
+                    /* HAPIJS RESPONSE CONFIGURATION */
+
+                    statusCode = errorStatusCode !== 0 ? errorStatusCode : (chosenResponse.statusCode || 200);
+
+                    if (!chosenResponse.statusCode) {
+                      this.printBlankLine();
+                      this.serverlessLog(`Warning: No statusCode found for response "${responseName}".`);
+                    }
+
+                    response.header('Content-Type', responseContentType, {
+                      override: false, // Maybe a responseParameter set it already. See #34
+                    });
+                    response.statusCode = statusCode;
+                    response.source = result;
                   }
-                }
+                  else if (integration === 'lambda-proxy') {
+                    response.statusCode = statusCode = result.statusCode || 200;
 
-                /* HAPIJS RESPONSE CONFIGURATION */
+                    const defaultHeaders = { 'Content-Type': 'application/json' };
 
-                const statusCode = parseInt(chosenResponse.statusCode) || 200;
-                if (!chosenResponse.statusCode) {
-                  printBlankLine();
-                  serverlessLog(`Warning: No statusCode found for response "${responseName}".`);
-                }
+                    Object.assign(response.headers, defaultHeaders, result.headers);
+                    if (!_.isUndefined(result.body)) {
+                      response.source = result.body;
+                    }
+                  }
 
-                response.header('Content-Type', responseContentType, {
-                  override: false, // Maybe a responseParameter set it already. See #34
-                });
-                response.statusCode = statusCode;
-                response.source = result;
 
                 // Log response
                 let whatToLog = result;
@@ -693,6 +712,9 @@ module.exports = S => {
     }
 
     _create404Route() {
+      // If a {proxy+} route exists, don't conflict with it
+      if (this.server.match('*', '/{p*}')) return;
+
       this.server.route({
         method: '*',
         path: '/{p*}',

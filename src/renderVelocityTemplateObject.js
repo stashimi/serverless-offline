@@ -1,7 +1,7 @@
 'use strict';
 
 const Velocity = require('velocityjs');
-const isPlainObject = require('lodash.isplainobject');
+const _ = require('lodash');
 
 const debugLog = require('./debugLog');
 
@@ -64,7 +64,7 @@ module.exports = function renderVelocityTemplateObject(templateObject, context) 
   if (typeof toProcess === 'string') toProcess = tryToParseJSON(toProcess);
 
   // Let's check again
-  if (isPlainObject(toProcess)) {
+  if (_.isPlainObject(toProcess)) {
     for (let key in toProcess) { // eslint-disable-line prefer-const
 
       const value = toProcess[key];
@@ -73,7 +73,7 @@ module.exports = function renderVelocityTemplateObject(templateObject, context) 
       if (typeof value === 'string') result[key] = renderVelocityString(value, context);
 
       // Go deeper
-      else if (isPlainObject(value)) result[key] = renderVelocityTemplateObject(value, context);
+      else if (_.isPlainObject(value)) result[key] = renderVelocityTemplateObject(value, context);
 
       // This should never happen: value should either be a string or a plain object
       else result[key] = value;
@@ -86,7 +86,7 @@ module.exports = function renderVelocityTemplateObject(templateObject, context) 
     // If the plugin threw here then you should consider reviewing your template or posting an issue.
     const alternativeResult = tryToParseJSON(renderVelocityString(toProcess, context));
 
-    return isPlainObject(alternativeResult) ? alternativeResult : result;
+    return _.isPlainObject(alternativeResult) ? alternativeResult : result;
   }
 
   return result;

@@ -8,7 +8,7 @@ const debugLog = require('./debugLog');
 const resetEnvVariables = require('./resetEnvVariables');
 const toPlainOrEmptyObject = require('./utils').toPlainOrEmptyObject;
 
-module.exports = function createAuthScheme(authFun, funRuntime, funName, endpointPath, options, serverlessLog) {
+module.exports = function createAuthScheme(authFun, funName, endpointPath, options, serverlessLog) {
   const authFunName = authFun.name;
 
   // Get Auth Function object with variables
@@ -59,16 +59,11 @@ module.exports = function createAuthScheme(authFun, funRuntime, funName, endpoin
         methodArn: `arn:aws:execute-api:${options.region}:<Account id>:<API id>/${options.stage}/${funName}/${endpointPath}`,
       };
 
-      // Set environment variables
-      const newEnvVars = toPlainOrEmptyObject(populatedAuthFun.environment);
-      resetEnvVariables(this.envVars, newEnvVars);
-      this.envVars = newEnvVars;
-
       // Create the Authorization function handler
       let handler;
 
       try {
-        handler = functionHelper.createHandler(funRuntime, funOptions, options);
+        handler = functionHelper.createHandler(funOptions, options);
       } catch (err) {
         return reply(Boom.badImplementation(null, `Error while loading ${authFunName}`));
       }
@@ -107,6 +102,9 @@ module.exports = function createAuthScheme(authFun, funRuntime, funName, endpoin
           onSuccess(result);
         }
       });
+
+      // Set environment variables
+      resetEnvVariables({}, toPlainOrEmptyObject(populatedAuthFun.environment));
 
       // Execute the Authorization Function
       handler(event, lambdaContext, lambdaContext.done);

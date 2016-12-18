@@ -2,11 +2,11 @@
 
 const jsonPath = require('./jsonPath');
 const jsEscapeString = require('js-string-escape');
-const isPlainObject = require('lodash.isplainobject');
+const _ = require('lodash');
 
 function escapeJavaScript(x) {
   if (typeof x === 'string') return jsEscapeString(x).replace(/\\n/g, '\n'); // See #26,
-  else if (isPlainObject(x)) {
+  else if (_.isPlainObject(x)) {
     const result = {};
     for (let key in x) { // eslint-disable-line prefer-const
       result[key] = jsEscapeString(x[key]);
